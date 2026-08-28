@@ -1,0 +1,58 @@
+-- Esquema para el proyecto de Supabase de cuencas-bot-corrientes.
+-- IMPORTANTE: esto va en un proyecto de Supabase NUEVO y separado del
+-- que usa cuencas-bot (Chaco). No corras esto sobre la base de Chaco.
+
+create table if not exists sos_tickets (
+    id text primary key,
+    created_at timestamptz default now(),
+    timestamp text,
+    nombre text,
+    telefono text,
+    localidad text,
+    direccion text,
+    lat double precision,
+    lon double precision,
+    personas_afectadas integer default 1,
+    altura_agua_cm integer,
+    nivel_urgencia text default 'ALTO',
+    requiere text[],
+    notas text,
+    estado text default 'PENDIENTE',
+    unidad_asignada text,
+    notas_despacho text
+);
+
+create index if not exists idx_sos_tickets_created_at on sos_tickets (created_at desc);
+
+create table if not exists reportes_ciudadanos (
+    id text primary key,
+    created_at timestamptz default now(),
+    timestamp text,
+    nombre text,
+    localidad text,
+    calle text,
+    lat double precision,
+    lon double precision,
+    nivel_agua_aprox text default 'CORDON',
+    descripcion text
+);
+
+create index if not exists idx_reportes_ciudadanos_created_at on reportes_ciudadanos (created_at desc);
+
+-- Suscripciones a alertas tempranas (Etapa 2): quien quiere recibir
+-- avisos, por que canal (telegram / push / email) y de que localidad.
+create table if not exists suscripciones_alertas (
+    id text primary key,
+    creado text,
+    canal text not null,       -- 'telegram' | 'push' | 'email'
+    destino text not null,     -- chat_id de Telegram / token FCM / email
+    localidad text default 'todas'
+);
+
+create index if not exists idx_suscripciones_localidad on suscripciones_alertas (localidad);
+
+-- RLS deshabilitado a proposito: solo el backend (con la service_role
+-- key) toca estas tablas, igual que en el proyecto de Chaco.
+alter table sos_tickets disable row level security;
+alter table reportes_ciudadanos disable row level security;
+alter table suscripciones_alertas disable row level security;
