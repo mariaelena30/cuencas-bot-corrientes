@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portal Hídrico Corrientes — Monitoreo de Crecidas</title>
+<style>
+  :root {
+    --celeste: #3C9FDA;
+    --celeste-oscuro: #1E6FA8;
+    --celeste-claro: #EAF5FC;
+    --blanco: #FFFFFF;
+    --rojo: #C0392B;
+    --rojo-claro: #FDECEA;
+    --rojo-borde: #E74C3C;
+    --verde: #2E8B57;
+    --verde-claro: #EAF7EF;
+    --amarillo: #B7791F;
+    --amarillo-claro: #FFF8E1;
+    --gris: #6B7280;
+    --gris-claro: #F3F4F6;
+    --texto: #1F2937;
+    --texto-suave: #4B5563;
+    --borde: #E2E8F0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--texto);
+    background: #F7FAFC;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, var(--celeste) 0%, var(--celeste-oscuro) 100%);
+    color: white;
+    padding: 0;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 18px 24px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 42px; height: 42px; border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .brand-text h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: 0.2px; }
+  .brand-text p { font-size: 12px; margin: 2px 0 0; opacity: 0.85; }
+  .estado-badge {
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #6EE7B7; }
+  .hero {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 8px 24px 36px;
+  }
+  .hero h2 { font-size: 26px; margin: 0 0 8px; font-weight: 700; max-width: 600px; }
+  .hero p { font-size: 14px; opacity: 0.9; max-width: 560px; margin: 0; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
+  section { margin-bottom: 44px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+  .section-head h3 { font-size: 20px; margin: 0; font-weight: 700; color: var(--texto); }
+  .section-sub { font-size: 13px; color: var(--texto-suave); margin: 0 0 18px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+
+  .card {
+    background: white;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .card-loc { border-top: 4px solid var(--gris); }
+  .card-loc.estado-normal { border-top-color: var(--verde); }
+  .card-loc.estado-alerta { border-top-color: var(--amarillo); }
+  .card-loc.estado-evacuacion { border-top-color: var(--rojo); }
+  .card-loc.estado-sin_dato { border-top-color: var(--gris); }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .card-nombre { font-weight: 700; font-size: 15px; margin: 0; }
+  .pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .pill-normal { background: var(--verde-claro); color: var(--verde); }
+  .pill-alerta { background: var(--amarillo-claro); color: var(--amarillo); }
+  .pill-evacuacion { background: var(--rojo-claro); color: var(--rojo); }
+  .pill-sin_dato { background: var(--gris-claro); color: var(--gris); }
+
+  .nivel-row { display: flex; align-items: baseline; gap: 6px; margin: 6px 0 10px; }
+  .nivel-num { font-size: 26px; font-weight: 700; }
+  .nivel-unidad { font-size: 13px; color: var(--texto-suave); }
+  .umbral-line { font-size: 12px; color: var(--texto-suave); margin: 2px 0; }
+  .tipo-tag { display: inline-block; margin-top: 8px; font-size: 11px; background: var(--celeste-claro); color: var(--celeste-oscuro); padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+
+  /* Zonas vulnerables — tarjetas rojas, deliberadamente distintas */
+  .card-vulnerable {
+    background: var(--rojo-claro);
+    border: 1.5px solid var(--rojo-borde);
+    border-radius: 12px;
+    padding: 16px 18px;
+    position: relative;
+  }
+  .card-vulnerable::before {
+    content: "⚠";
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    color: var(--rojo);
+    font-size: 16px;
+  }
+  .card-vulnerable h4 { margin: 0 0 6px; font-size: 15px; color: var(--rojo); font-weight: 700; padding-right: 24px; }
+  .card-vulnerable p { margin: 4px 0; font-size: 13px; color: #7A2E22; }
+  .card-vulnerable .label { font-weight: 600; }
+  .sin-confirmar { display: inline-block; margin-top: 8px; font-size: 11px; background: white; color: var(--rojo); border: 1px solid var(--rojo-borde); padding: 3px 8px; border-radius: 6px; font-weight: 700; }
+
+  /* Organismos */
+  .org-card { display: flex; gap: 12px; }
+  .org-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--celeste-claro); color: var(--celeste-oscuro); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .org-body h4 { margin: 0 0 2px; font-size: 14px; }
+  .org-body .org-nivel { font-size: 11px; color: var(--celeste-oscuro); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+  .org-body p { margin: 0; font-size: 12.5px; color: var(--texto-suave); }
+  .org-body a { color: var(--celeste-oscuro); font-size: 12px; text-decoration: none; font-weight: 600; }
+
+  /* Relieve */
+  .relieve-box {
+    background: var(--celeste-claro);
+    border: 1px solid #BFE0F5;
+    border-radius: 12px;
+    padding: 18px 20px;
+    font-size: 13.5px;
+    color: #1A5276;
+  }
+
+  footer {
+    border-top: 1px solid var(--borde);
+    padding: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--texto-suave);
+  }
+  .conn-status { font-size: 11px; text-align: center; padding: 6px; color: var(--texto-suave); }
+
+  @media (max-width: 600px) {
+    .header-top { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .hero h2 { font-size: 21px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="brand">
+      <div class="brand-mark">🌊</div>
+      <div class="brand-text">
+        <h1>Portal Hídrico Corrientes</h1>
+        <p>Monitoreo de crecidas y alerta temprana</p>
+      </div>
+    </div>
+    <div class="estado-badge"><span class="dot"></span> <span id="estado-general-txt">Cargando estado…</span></div>
+  </div>
+  <div class="hero">
+    <h2>Información oficial del río Paraná y zonas vulnerables de Corrientes</h2>
+    <p>Datos verificados contra Prefectura Naval Argentina (vía CIM-UNL). Complementa, no reemplaza, a Defensa Civil.</p>
+  </div>
+</header>
+
+<div class="conn-status" id="conn-status">Mostrando datos de referencia — conectando con la API en vivo…</div>
+
+<main>
+
+  <section>
+    <div class="section-head">
+      <h3>Localidades — río Paraná</h3>
+    </div>
+    <p class="section-sub">Nivel actual, umbrales oficiales y tipo de inundación dominante por localidad.</p>
+    <div class="grid" id="localidades-grid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h3>Zonas vulnerables</h3>
+    </div>
+    <p class="section-sub">Barrios de la capital reportados como afectados en crecidas recientes. Marcados en rojo para diferenciarlos de las estaciones de medición.</p>
+    <div class="grid" id="barrios-grid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h3>Organismos de referencia</h3>
+    </div>
+    <p class="section-sub">Fuentes oficiales, nacionales, provinciales y binacionales, que sostienen los datos de este portal.</p>
+    <div class="grid" id="organismos-grid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h3>Por qué importa el relieve</h3>
+    </div>
+    <div class="relieve-box" id="relieve-box">Cargando…</div>
+  </section>
+
+</main>
+
+<footer>
+  Datos de referencia: Prefectura Naval Argentina (vía CIM-UNL), verificados 25/08/2026 · Instituto Correntino del Agua y del Ambiente (ICAA) · Defensa Civil de Corrientes.<br/>
+  Este portal es una herramienta complementaria, no oficial. Ante una emergencia, seguí siempre las indicaciones de Defensa Civil.
+</footer>
+
+<script>
+// ---------------------------------------------------------------------
+// CONFIGURACION: cambiar por la URL real de Render una vez desplegado
+// el backend cuencas-bot-corrientes.
+// ---------------------------------------------------------------------
+const API_URL = "https://cuencas-bot-corrientes.onrender.com";
+
+// ---------------------------------------------------------------------
+// DATOS DE REFERENCIA (fallback) — copia exacta de lo que ya vive en
+// main.py, para que el frontend se vea "terminado" incluso sin que el
+// backend este desplegado todavia. Se reemplazan automaticamente por
+// datos en vivo si la API responde.
+// ---------------------------------------------------------------------
+const LOCALIDADES_FALLBACK = {
+  corrientes: { nombre: "Corrientes (capital)", nivel_metros: 2.88, umbral_alerta: 6.50, umbral_evacuacion: 7.00, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  empedrado: { nombre: "Empedrado", nivel_metros: 2.95, umbral_alerta: 6.50, umbral_evacuacion: 6.70, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  bella_vista_ctes: { nombre: "Bella Vista", nivel_metros: 3.20, umbral_alerta: 6.00, umbral_evacuacion: 6.40, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  goya: { nombre: "Goya", nivel_metros: 3.16, umbral_alerta: 5.20, umbral_evacuacion: 5.70, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  ituzaingo: { nombre: "Ituzaingó", nivel_metros: 1.50, umbral_alerta: 3.50, umbral_evacuacion: 4.00, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  itati: { nombre: "Itatí", nivel_metros: 2.99, umbral_alerta: 6.80, umbral_evacuacion: 7.50, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  paso_de_la_patria: { nombre: "Paso de la Patria", nivel_metros: 2.93, umbral_alerta: 6.50, umbral_evacuacion: 7.00, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  ita_ibate: { nombre: "Ita Ibaté", nivel_metros: 1.86, umbral_alerta: 7.00, umbral_evacuacion: 7.50, tipo_inundacion_dominante: "fluvial", estado: "NORMAL" },
+  santa_ana_ctes: { nombre: "Santa Ana", nivel_metros: 7.47, umbral_alerta: 9.30, umbral_evacuacion: 9.80, tipo_inundacion_dominante: "fluvial", estado: "ALERTA" },
+};
+
+const BARRIOS_FALLBACK = {
+  la_olla_ctes: { nombre: "Barrio La Olla", motivo: "Reportado en prensa como una de las zonas más afectadas por anegamiento en la crecida de dic. 2025 / ene. 2026" },
+  san_ignacio_ctes: { nombre: "Barrio San Ignacio", motivo: "Reportado en prensa como zona anegada en la crecida de dic. 2025 / ene. 2026" },
+  laguna_seca_ctes: { nombre: "Laguna Seca", motivo: "Reportado en prensa como zona anegada, con escuela usada como referencia de evacuación" },
+  anahi_ctes: { nombre: "Barrio Anahí", motivo: "Reportado en prensa como zona anegada en la crecida de dic. 2025 / ene. 2026" },
+};
+
+const ORGANISMOS_FALLBACK = {
+  smn: { nombre: "Servicio Meteorológico Nacional (SMN)", nivel: "Nacional", rol: "Pronóstico del tiempo y alerta temprana meteorológica.", url: "https://www.smn.gob.ar" },
+  ina: { nombre: "Instituto Nacional del Agua (INA)", nivel: "Nacional", rol: "Pronóstico hidrológico del río Paraná, Paraguay, Iguazú y Uruguay.", url: "https://www.ina.gob.ar/siyah/index.php" },
+  icaa: { nombre: "Instituto Correntino del Agua y del Ambiente (ICAA)", nivel: "Provincial", rol: "Organismo hídrico de la provincia de Corrientes.", url: "https://icaa.corrientes.gob.ar" },
+  defensa_civil_corrientes: { nombre: "Defensa Civil de Corrientes", nivel: "Provincial", rol: "Coordinación operativa de emergencias hídricas.", url: null },
+  eby: { nombre: "Entidad Binacional Yacyretá (EBY)", nivel: "Binacional", rol: "Gestión de la represa Yacyretá.", url: null },
+  sinagir: { nombre: "SINAGIR", nivel: "Nacional", rol: "Coordinación nacional de gestión integral del riesgo.", url: null },
+};
+
+const RELIEVE_FALLBACK = "Provincia mayormente llana. Altitud media de la provincia: ~73 m sobre el nivel del mar. Punto más alto: cerca de San Carlos, límite con Misiones, 229 m. Los Esteros del Iberá (~12.000 km² en Corrientes) tienen una pendiente de apenas 1 por mil, lo que hace el desagüe de lluvia estructuralmente muy lento en gran parte del territorio.";
+
+function estadoClase(estado) {
+  return (estado || "sin_dato").toLowerCase();
+}
+
+function pintarLocalidades(localidades) {
+  const grid = document.getElementById("localidades-grid");
+  grid.innerHTML = "";
+  Object.values(localidades).forEach(loc => {
+    const cls = estadoClase(loc.estado);
+    const card = document.createElement("div");
+    card.className = "card card-loc estado-" + cls;
+    card.innerHTML = `
+      <div class="card-top">
+        <p class="card-nombre">${loc.nombre}</p>
+        <span class="pill pill-${cls}">${loc.estado || "SIN DATO"}</span>
+      </div>
+      <div class="nivel-row">
+        <span class="nivel-num">${loc.nivel_metros != null ? loc.nivel_metros.toFixed(2) : "—"}</span>
+        <span class="nivel-unidad">metros</span>
+      </div>
+      <div class="umbral-line">Alerta: ${loc.umbral_alerta != null ? loc.umbral_alerta.toFixed(2) + " m" : "sin dato"}</div>
+      <div class="umbral-line">Evacuación: ${loc.umbral_evacuacion != null ? loc.umbral_evacuacion.toFixed(2) + " m" : "sin dato"}</div>
+      <span class="tipo-tag">${loc.tipo_inundacion_dominante || "sin clasificar"}</span>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function pintarBarrios(barrios) {
+  const grid = document.getElementById("barrios-grid");
+  grid.innerHTML = "";
+  Object.values(barrios).forEach(b => {
+    const card = document.createElement("div");
+    card.className = "card-vulnerable";
+    card.innerHTML = `
+      <h4>${b.nombre}</h4>
+      <p><span class="label">Motivo:</span> ${b.motivo || "Sin dato"}</p>
+      <span class="sin-confirmar">Sin confirmar por Defensa Civil</span>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function pintarOrganismos(organismos) {
+  const grid = document.getElementById("organismos-grid");
+  grid.innerHTML = "";
+  Object.values(organismos).forEach(o => {
+    const card = document.createElement("div");
+    card.className = "card org-card";
+    const iniciales = o.nombre.split(" ").filter(w => w[0] === w[0].toUpperCase()).slice(0, 2).map(w => w[0]).join("");
+    card.innerHTML = `
+      <div class="org-icon">${iniciales.slice(0, 2)}</div>
+      <div class="org-body">
+        <div class="org-nivel">${o.nivel}</div>
+        <h4>${o.nombre}</h4>
+        <p>${o.rol}</p>
+        ${o.url ? `<a href="${o.url}" target="_blank" rel="noopener">Sitio oficial ↗</a>` : ""}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function pintarRelieve(texto) {
+  document.getElementById("relieve-box").textContent = texto;
+}
+
+function actualizarEstadoGeneral(localidades) {
+  const estados = Object.values(localidades).map(l => l.estado);
+  const txt = document.getElementById("estado-general-txt");
+  if (estados.includes("EVACUACION")) txt.textContent = "Hay localidades en evacuación";
+  else if (estados.includes("ALERTA")) txt.textContent = "Hay localidades en alerta";
+  else txt.textContent = "Todas las localidades en estado normal";
+}
+
+async function cargarDatos() {
+  const connStatus = document.getElementById("conn-status");
+  try {
+    const [locRes, barRes, orgRes, relRes] = await Promise.all([
+      fetch(API_URL + "/localidades").then(r => r.json()),
+      fetch(API_URL + "/barrios").then(r => r.json()),
+      fetch(API_URL + "/organismos").then(r => r.json()),
+      fetch(API_URL + "/relieve").then(r => r.json()),
+    ]);
+    pintarLocalidades(locRes.localidades);
+    pintarBarrios(barRes.barrios);
+    pintarOrganismos(orgRes.organismos);
+    pintarRelieve(relRes.resumen);
+    actualizarEstadoGeneral(locRes.localidades);
+    connStatus.textContent = "Conectado a la API en vivo";
+    connStatus.style.color = "#2E8B57";
+  } catch (e) {
+    pintarLocalidades(LOCALIDADES_FALLBACK);
+    pintarBarrios(BARRIOS_FALLBACK);
+    pintarOrganismos(ORGANISMOS_FALLBACK);
+    pintarRelieve(RELIEVE_FALLBACK);
+    actualizarEstadoGeneral(LOCALIDADES_FALLBACK);
+    connStatus.textContent = "Mostrando datos de referencia (API no disponible todavía)";
+  }
+}
+
+cargarDatos();
+</script>
+
+</body>
+</html>
