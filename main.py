@@ -195,10 +195,10 @@ CUENCAS: dict = {
 # ---------------------------------------------------------------------
 localidades: dict = {
     "corrientes": {
-        "nombre": "Corrientes (capital)", "cuenca_clave": "parana", "nivel_metros": 2.88,
+        "nombre": "Corrientes (capital)", "cuenca_clave": "parana", "nivel_metros": 2.65,
         "umbral_alerta": 6.50, "umbral_evacuacion": 7.00, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Corrientes (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
+        "fuente": "INA, reporte diario oficial (alerta.ina.gob.ar), 28/08/2026 - umbrales cruzados y confirmados contra CIM-UNL",
+        "conectado": False, "ultima_verificacion": "2026-08-28",
         "tipo_inundacion_dominante": "fluvial",
         "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia). Represa Yacyreta aguas arriba (Argentina-Paraguay).",
     },
@@ -219,10 +219,10 @@ localidades: dict = {
         "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
     },
     "goya": {
-        "nombre": "Goya", "cuenca_clave": "parana", "nivel_metros": 3.16,
+        "nombre": "Goya", "cuenca_clave": "parana", "nivel_metros": 2.96,
         "umbral_alerta": 5.20, "umbral_evacuacion": 5.70, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Goya (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
+        "fuente": "INA, reporte diario oficial (alerta.ina.gob.ar), 28/08/2026 - umbrales cruzados y confirmados contra CIM-UNL",
+        "conectado": False, "ultima_verificacion": "2026-08-28",
         "tipo_inundacion_dominante": "fluvial",
         "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
     },
@@ -232,7 +232,7 @@ localidades: dict = {
         "fuente": "Prefectura Naval Argentina, estacion Ituzaingo (via CIM-UNL, verificado 25/08/2026)",
         "conectado": False, "ultima_verificacion": "2026-08-25",
         "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Influencia DIRECTA de la represa Yacyreta (Argentina-Paraguay, EBY), ademas de lluvias en el sur de Brasil sobre la cuenca alta del Parana.",
+        "influencia_internacional": "Influencia DIRECTA de la represa Yacyreta (Argentina-Paraguay, EBY), ademas de lluvias en el sur de Brasil sobre la cuenca alta del Parana. Ver tambien /aguas-arriba (afluente/efluente Yacyreta).",
     },
     "itati": {
         "nombre": "Itatí", "cuenca_clave": "parana", "nivel_metros": 2.99,
@@ -240,7 +240,7 @@ localidades: dict = {
         "fuente": "Prefectura Naval Argentina, estacion Itati (via CIM-UNL, verificado 25/08/2026)",
         "conectado": False, "ultima_verificacion": "2026-08-25",
         "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Influencia directa de la operacion de la represa Yacyreta (aguas abajo inmediato) y de lluvias en el sur de Brasil.",
+        "influencia_internacional": "Influencia directa de la operacion de la represa Yacyreta (aguas abajo inmediato) y de lluvias en el sur de Brasil. Tambien recibe la propagacion de crecidas del rio Iguazu via la Confluencia - ver /aguas-arriba.",
     },
     "paso_de_la_patria": {
         "nombre": "Paso de la Patria", "cuenca_clave": "parana", "nivel_metros": 2.93,
@@ -265,6 +265,53 @@ localidades: dict = {
         "conectado": False, "ultima_verificacion": "2026-08-25",
         "tipo_inundacion_dominante": "fluvial",
         "influencia_internacional": "Lluvias en el sur de Brasil sobre la cuenca alta del rio Parana.",
+    },
+}
+
+# ---------------------------------------------------------------------
+# ESTACIONES DE REFERENCIA AGUAS ARRIBA — sumado 29/08/2026, a partir
+# del reporte diario oficial del INA (alerta.ina.gob.ar/a5/diario/
+# reporte_diario) del 28/08/2026. No son localidades de Corrientes,
+# pero son indicadores tempranos: lo que pasa aca hoy llega a Itati/
+# Ituzaingo/Corrientes en pocos dias. Caudal en m3/s (no nivel en
+# metros, por eso van en un dict aparte).
+#
+# DATO DESTACABLE: Puerto Iguazu (rio Iguazu, Brasil/Argentina) subio
+# +3.50 m en un solo dia (28/08/2026) - senal de crecida fuerte aguas
+# arriba que, segun el propio INA, "propaga ondas al rio Parana" y
+# afecta directo la zona de Confluencia/Itati/Ituzaingo.
+# ---------------------------------------------------------------------
+ESTACIONES_AGUAS_ARRIBA: dict = {
+    "puerto_iguazu": {
+        "nombre": "Puerto Iguazú", "rio": "Iguazú", "unidad": "nivel_m",
+        "valor": 14.00, "variacion_diaria": 3.50, "tendencia": "subiendo fuerte",
+        "umbral_alerta": 25.00, "umbral_evacuacion": 28.00,
+        "relevancia": "Crecida del Iguazu propaga ondas al Parana; afecta Confluencia, Itati e Ituzaingo en pocos dias.",
+    },
+    "guaira_porto": {
+        "nombre": "Guaíra Porto (Brasil)", "rio": "Alto Paraná", "unidad": "caudal_m3s",
+        "valor": 7600, "umbral_alerta": 20000, "umbral_evacuacion": 25000,
+        "relevancia": "Indicador de cabecera del Alto Parana en territorio brasileño, antes de Itaipú.",
+    },
+    "represa_itaipu": {
+        "nombre": "Represa Itaipú (Brasil-Paraguay)", "rio": "Alto Paraná", "unidad": "caudal_m3s",
+        "valor": 10100, "umbral_alerta": 20000, "umbral_evacuacion": 25000,
+        "relevancia": "Mayor represa del mundo; su erogacion determina el caudal que llega a Yacyreta y de ahi a Corrientes.",
+    },
+    "confluencia": {
+        "nombre": "Confluencia (Paraná/Iguazú)", "rio": "Paraná/Iguazú", "unidad": "caudal_m3s",
+        "valor": 13532, "umbral_alerta": 25000, "umbral_evacuacion": 30000,
+        "relevancia": "Punto donde el rio Iguazu se une al Parana - primer indicador de si la crecida de Iguazu ya impacto el tramo argentino.",
+    },
+    "yacyreta_afluente": {
+        "nombre": "Yacyretá (afluente)", "rio": "Paraná", "unidad": "caudal_m3s",
+        "valor": 13100, "umbral_alerta": 25000, "umbral_evacuacion": 30000,
+        "relevancia": "Caudal entrando a la represa Yacyreta, justo aguas arriba de Ituzaingo.",
+    },
+    "yacyreta_efluente": {
+        "nombre": "Yacyretá (efluente)", "rio": "Paraná", "unidad": "caudal_m3s",
+        "valor": 12400, "umbral_alerta": 25000, "umbral_evacuacion": 30000,
+        "relevancia": "Caudal erogado por Yacyreta - lo que efectivamente recibe Ituzaingo/Itati aguas abajo. Diferencia con el afluente indica si la represa esta reteniendo o liberando agua.",
     },
 }
 
@@ -416,6 +463,9 @@ ORGANISMOS: dict = {
         "rol": "Calcula los PRONOSTICOS hidrologicos (no solo mide el nivel actual) de los rios Parana, Paraguay, Iguazu y Uruguay, via su Sistema de Informacion y Alerta Hidrologico (SIyAH). Reportes diarios.",
         "url": "https://www.ina.gob.ar/siyah/index.php",
         "url_alertas": "https://alerta.ina.gob.ar/a5/diario/reporte_diario",
+        "url_rss": "https://ina.gov.ar/alerta/rss/index.php",
+        "url_api": "https://alerta.ina.gob.ar/a5/secciones",
+        "nota": "El RSS publica un cuadro diario nuevo cada dia (Cuadro_AAAAmesDD.pdf) - candidato para automatizar la carga de datos en vez de depender solo del scraper de CIM-UNL.",
     },
     "icaa": {
         "nombre": "Instituto Correntino del Agua y del Ambiente (ICAA)",
@@ -451,6 +501,17 @@ ORGANISMOS: dict = {
 @app.get("/organismos")
 def listar_organismos():
     return {"organismos": ORGANISMOS}
+
+
+@app.get("/aguas-arriba")
+def estaciones_aguas_arriba():
+    """
+    Estaciones de referencia aguas arriba (Brasil/Paraguay/frontera) que
+    sirven de indicador temprano para lo que va a llegar a Corrientes en
+    los proximos dias. Fuente: reporte diario oficial del INA
+    (alerta.ina.gob.ar), dato del 28/08/2026.
+    """
+    return {"estaciones": ESTACIONES_AGUAS_ARRIBA, "fuente": "INA - alerta.ina.gob.ar/a5/diario/reporte_diario", "fecha_dato": "2026-08-28"}
 
 
 @app.get("/relieve")
