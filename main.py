@@ -21,9 +21,12 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# --- 1. IMPORTAMOS EL ROUTER SATELITAL AISLADO ---
+from satelites_ctes import router as satelites_router
 
 app = FastAPI(title="Portal Hidrico Corrientes - API")
 
@@ -55,6 +58,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- 2. INCLUIMOS EL ROUTER SATELITAL CON SUS ENDPOINTS EN FASTAPI ---
+app.include_router(satelites_router)
 
 # ---------------------------------------------------------------------
 # EXPLICACIONES EN LENGUAJE SIMPLE
@@ -114,24 +120,6 @@ CUENCAS: dict = {
         "internacional": True,
         "paises_cuenca_alta": ["Brasil", "Paraguay", "Bolivia"],
     },
-    # -----------------------------------------------------------------
-    # CUENCAS INTERNAS DE LA PROVINCIA — sumadas 26/08/2026. Distintas
-    # del Parana: no dependen del nivel del rio grande, sino de lluvia
-    # local sobre una provincia con pendiente casi nula (los Esteros
-    # del Ibera tienen apenas 1 por mil de pendiente, lo que hace el
-    # desague naturalmente muy lento). Segun el propio director de
-    # Defensa Civil de Corrientes (Bruno Lovison, declaraciones a
-    # RadioNord, julio 2026), estos rios internos "suelen ser los que
-    # mayores inconvenientes generan en el interior provincial".
-    #
-    # HONESTIDAD DE DATOS: a diferencia del Parana, NO encontramos una
-    # estacion de medicion publica en tiempo real para estos rios (no
-    # estan en la tabla de fich.unl.edu.ar ni en niveles_rios.json).
-    # Por eso nivel_metros/umbral_alerta/umbral_evacuacion quedan en
-    # None en vez de inventar un numero - falta gestionar el dato con
-    # el ICAA (Instituto Correntino del Agua y del Ambiente) o Defensa
-    # Civil provincial para poder monitorearlos de verdad.
-    # -----------------------------------------------------------------
     "rio_corrientes": {
         "nombre": "Rio Corrientes (interno)",
         "estacion": None,
@@ -170,596 +158,65 @@ CUENCAS: dict = {
     },
 }
 
-# ---------------------------------------------------------------------
-# LOCALIDADES — niveles y umbrales oficiales, RE-VERIFICADOS EN VIVO
-# el 25/08/2026 contra fich.unl.edu.ar/cim/rios/parana/alturas.
-# Los umbrales de alerta/evacuacion NO cambiaron respecto a la
-# verificacion del 24/08 (son estables, no varian dia a dia). Los
-# niveles actuales si se actualizaron a la lectura de hoy.
-#
-# CLAVE PARA QUE /historico FUNCIONE CON DATOS REALES: el endpoint
-# compara el parametro contra el campo "puerto" tal cual lo guarda
-# actualizar_niveles.py en niveles_rios.json, que a su vez copia el
-# nombre EXACTO de la columna "Puerto" de la tabla de Prefectura Naval.
-# La comparacion es case-insensitive pero NO ignora tildes, asi que
-# hay que llamar al endpoint con el nombre EXACTO de la tabla:
-#   corrientes          -> /historico/Corrientes
-#   empedrado           -> /historico/Empedrado
-#   bella_vista_ctes     -> /historico/Bella Vista
-#   goya                -> /historico/Goya
-#   ituzaingo           -> /historico/Ituzaingó   (CON tilde en la tabla)
-#   itati               -> /historico/Itati       (SIN tilde en la tabla)
-#   paso_de_la_patria   -> /historico/Paso de la Patria
-#   ita_ibate           -> /historico/Ita Ibate    (SIN tilde en la tabla)
-#   santa_ana_ctes       -> /historico/Santa Ana
-# ---------------------------------------------------------------------
-localidades: dict = {
-    "corrientes": {
-        "nombre": "Corrientes (capital)", "cuenca_clave": "parana", "nivel_metros": 2.65,
-        "umbral_alerta": 6.50, "umbral_evacuacion": 7.00, "precipitacion_acumulada_mm": None,
-        "fuente": "INA, reporte diario oficial (alerta.ina.gob.ar), 28/08/2026 - umbrales cruzados y confirmados contra CIM-UNL",
-        "conectado": False, "ultima_verificacion": "2026-08-28",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia). Represa Yacyreta aguas arriba (Argentina-Paraguay).",
-    },
-    "empedrado": {
-        "nombre": "Empedrado", "cuenca_clave": "parana", "nivel_metros": 2.95,
-        "umbral_alerta": 6.50, "umbral_evacuacion": 6.70, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Empedrado (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
-    },
-    "bella_vista_ctes": {
-        "nombre": "Bella Vista", "cuenca_clave": "parana", "nivel_metros": 3.20,
-        "umbral_alerta": 6.00, "umbral_evacuacion": 6.40, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Bella Vista (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
-    },
-    "goya": {
-        "nombre": "Goya", "cuenca_clave": "parana", "nivel_metros": 2.96,
-        "umbral_alerta": 5.20, "umbral_evacuacion": 5.70, "precipitacion_acumulada_mm": None,
-        "fuente": "INA, reporte diario oficial (alerta.ina.gob.ar), 28/08/2026 - umbrales cruzados y confirmados contra CIM-UNL",
-        "conectado": False, "ultima_verificacion": "2026-08-28",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
-    },
-    "ituzaingo": {
-        "nombre": "Ituzaingó", "cuenca_clave": "parana", "nivel_metros": 1.50,
-        "umbral_alerta": 3.50, "umbral_evacuacion": 4.00, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Ituzaingo (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Influencia DIRECTA de la represa Yacyreta (Argentina-Paraguay, EBY), ademas de lluvias en el sur de Brasil sobre la cuenca alta del Parana. Ver tambien /aguas-arriba (afluente/efluente Yacyreta).",
-    },
-    "itati": {
-        "nombre": "Itatí", "cuenca_clave": "parana", "nivel_metros": 2.99,
-        "umbral_alerta": 6.80, "umbral_evacuacion": 7.50, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Itati (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Influencia directa de la operacion de la represa Yacyreta (aguas abajo inmediato) y de lluvias en el sur de Brasil. Tambien recibe la propagacion de crecidas del rio Iguazu via la Confluencia - ver /aguas-arriba.",
-    },
-    "paso_de_la_patria": {
-        "nombre": "Paso de la Patria", "cuenca_clave": "parana", "nivel_metros": 2.93,
-        "umbral_alerta": 6.50, "umbral_evacuacion": 7.00, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Paso de la Patria (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
-    },
-    "ita_ibate": {
-        "nombre": "Ita Ibaté", "cuenca_clave": "parana", "nivel_metros": 1.86,
-        "umbral_alerta": 7.00, "umbral_evacuacion": 7.50, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Ita Ibate (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el centro-este de Brasil (cuenca alta del Parana) y aporte del rio Paraguay (Paraguay/Bolivia).",
-    },
-    "santa_ana_ctes": {
-        "nombre": "Santa Ana", "cuenca_clave": "parana", "nivel_metros": 7.47,
-        "umbral_alerta": 9.30, "umbral_evacuacion": 9.80, "precipitacion_acumulada_mm": None,
-        "fuente": "Prefectura Naval Argentina, estacion Santa Ana (via CIM-UNL, verificado 25/08/2026)",
-        "conectado": False, "ultima_verificacion": "2026-08-25",
-        "tipo_inundacion_dominante": "fluvial",
-        "influencia_internacional": "Lluvias en el sur de Brasil sobre la cuenca alta del rio Parana.",
-    },
-}
-
-# ---------------------------------------------------------------------
-# ESTACIONES DE REFERENCIA AGUAS ARRIBA — sumado 29/08/2026, a partir
-# del reporte diario oficial del INA (alerta.ina.gob.ar/a5/diario/
-# reporte_diario) del 28/08/2026. No son localidades de Corrientes,
-# pero son indicadores tempranos: lo que pasa aca hoy llega a Itati/
-# Ituzaingo/Corrientes en pocos dias. Caudal en m3/s (no nivel en
-# metros, por eso van en un dict aparte).
-#
-# DATO DESTACABLE: Puerto Iguazu (rio Iguazu, Brasil/Argentina) subio
-# +3.50 m en un solo dia (28/08/2026) - senal de crecida fuerte aguas
-# arriba que, segun el propio INA, "propaga ondas al rio Parana" y
-# afecta directo la zona de Confluencia/Itati/Ituzaingo.
-# ---------------------------------------------------------------------
-ESTACIONES_AGUAS_ARRIBA: dict = {
-    "puerto_iguazu": {
-        "nombre": "Puerto Iguazú", "rio": "Iguazú", "unidad": "nivel_m",
-        "valor": 14.00, "variacion_diaria": 3.50, "tendencia": "subiendo fuerte",
-        "umbral_alerta": 25.00, "umbral_evacuacion": 28.00,
-        "relevancia": "Crecida del Iguazu propaga ondas al Parana; afecta Confluencia, Itati e Ituzaingo en pocos dias.",
-    },
-    "guaira_porto": {
-        "nombre": "Guaíra Porto (Brasil)", "rio": "Alto Paraná", "unidad": "caudal_m3s",
-        "valor": 7600, "umbral_alerta": 20000, "umbral_evacuacion": 25000,
-        "relevancia": "Indicador de cabecera del Alto Parana en territorio brasileño, antes de Itaipú.",
-    },
-    "represa_itaipu": {
-        "nombre": "Represa Itaipú (Brasil-Paraguay)", "rio": "Alto Paraná", "unidad": "caudal_m3s",
-        "valor": 10100, "umbral_alerta": 20000, "umbral_evacuacion": 25000,
-        "relevancia": "Mayor represa del mundo; su erogacion determina el caudal que llega a Yacyreta y de ahi a Corrientes.",
-    },
-    "confluencia": {
-        "nombre": "Confluencia (Paraná/Iguazú)", "rio": "Paraná/Iguazú", "unidad": "caudal_m3s",
-        "valor": 13532, "umbral_alerta": 25000, "umbral_evacuacion": 30000,
-        "relevancia": "Punto donde el rio Iguazu se une al Parana - primer indicador de si la crecida de Iguazu ya impacto el tramo argentino.",
-    },
-    "yacyreta_afluente": {
-        "nombre": "Yacyretá (afluente)", "rio": "Paraná", "unidad": "caudal_m3s",
-        "valor": 13100, "umbral_alerta": 25000, "umbral_evacuacion": 30000,
-        "relevancia": "Caudal entrando a la represa Yacyreta, justo aguas arriba de Ituzaingo.",
-    },
-    "yacyreta_efluente": {
-        "nombre": "Yacyretá (efluente)", "rio": "Paraná", "unidad": "caudal_m3s",
-        "valor": 12400, "umbral_alerta": 25000, "umbral_evacuacion": 30000,
-        "relevancia": "Caudal erogado por Yacyreta - lo que efectivamente recibe Ituzaingo/Itati aguas abajo. Diferencia con el afluente indica si la represa esta reteniendo o liberando agua.",
-    },
-}
-
-# ---------------------------------------------------------------------
-# BARRIOS VULNERABLES — solo Corrientes capital por ahora. Reportados
-# por prensa como zonas anegadas en la crecida de dic. 2025 / ene. 2026.
-# NO se inventan coordenadas propias ni conteo de familias: falta un
-# dato oficial de Defensa Civil / Municipalidad de Corrientes para
-# completar esto con precision, asi que esos campos quedan en None.
-# ---------------------------------------------------------------------
-BARRIOS_VULNERABLES: dict = {
-    "la_olla_ctes": {
-        "nombre": "Barrio La Olla", "localidad_padre": "corrientes",
-        "lat": -27.4692, "lon": -58.8306,
-        "precision": "aproximada (coordenadas del centro de Corrientes capital, sin geolocalizacion propia verificada)",
-        "motivo": "Reportado en prensa como una de las zonas mas afectadas por anegamiento en la crecida de dic. 2025 / ene. 2026",
-        "cota_inundacion_m": None, "familias_estimadas": None,
-        "via_acceso_critica": "Sin dato verificado",
-        "tipo_inundacion_dominante": "pluvial (hipotesis, sin confirmar por Defensa Civil): la provincia tiene pendiente casi nula (los Esteros del Ibera bajan apenas 1 por mil), por lo que el desague de lluvia local es estructuralmente lento en toda la zona baja de la capital, independiente del nivel del Parana.",
-    },
-    "san_ignacio_ctes": {
-        "nombre": "Barrio San Ignacio", "localidad_padre": "corrientes",
-        "lat": -27.4692, "lon": -58.8306,
-        "precision": "aproximada (coordenadas del centro de Corrientes capital, sin geolocalizacion propia verificada)",
-        "motivo": "Reportado en prensa como zona anegada en la crecida de dic. 2025 / ene. 2026",
-        "cota_inundacion_m": None, "familias_estimadas": None,
-        "via_acceso_critica": "Sin dato verificado",
-        "tipo_inundacion_dominante": "pluvial (hipotesis, sin confirmar por Defensa Civil): la provincia tiene pendiente casi nula (los Esteros del Ibera bajan apenas 1 por mil), por lo que el desague de lluvia local es estructuralmente lento en toda la zona baja de la capital, independiente del nivel del Parana.",
-    },
-    "laguna_seca_ctes": {
-        "nombre": "Laguna Seca", "localidad_padre": "corrientes",
-        "lat": -27.4692, "lon": -58.8306,
-        "precision": "aproximada (coordenadas del centro de Corrientes capital, sin geolocalizacion propia verificada)",
-        "motivo": "Reportado en prensa como zona anegada, con escuela usada como referencia de evacuacion en la crecida de dic. 2025 / ene. 2026",
-        "cota_inundacion_m": None, "familias_estimadas": None,
-        "via_acceso_critica": "Sin dato verificado",
-        "tipo_inundacion_dominante": "pluvial (hipotesis, sin confirmar por Defensa Civil): la provincia tiene pendiente casi nula (los Esteros del Ibera bajan apenas 1 por mil), por lo que el desague de lluvia local es estructuralmente lento en toda la zona baja de la capital, independiente del nivel del Parana.",
-    },
-    "anahi_ctes": {
-        "nombre": "Barrio Anahí", "localidad_padre": "corrientes",
-        "lat": -27.4692, "lon": -58.8306,
-        "precision": "aproximada (coordenadas del centro de Corrientes capital, sin geolocalizacion propia verificada)",
-        "motivo": "Reportado en prensa como zona anegada en la crecida de dic. 2025 / ene. 2026",
-        "cota_inundacion_m": None, "familias_estimadas": None,
-        "via_acceso_critica": "Sin dato verificado",
-        "tipo_inundacion_dominante": "pluvial (hipotesis, sin confirmar por Defensa Civil): la provincia tiene pendiente casi nula (los Esteros del Ibera bajan apenas 1 por mil), por lo que el desague de lluvia local es estructuralmente lento en toda la zona baja de la capital, independiente del nivel del Parana.",
-    },
-}
-
-
-# ---------------------------------------------------------------------
-# CLASIFICACION DE ESTADO (verde/amarillo/rojo)
-# ---------------------------------------------------------------------
-def calcular_estado(nivel, umbral_alerta, umbral_evacuacion):
-    if nivel is None or umbral_alerta is None or umbral_evacuacion is None:
-        return "SIN_DATO", "⚪"
-    if nivel >= umbral_evacuacion:
-        return "EVACUACION", "🔴"
-    if nivel >= umbral_alerta:
-        return "ALERTA", "🟡"
-    return "NORMAL", "🟢"
-
-
-def _cuenca_con_estado(clave: str) -> dict:
-    c = CUENCAS[clave]
-    estado, emoji = calcular_estado(c["nivel_metros"], c["umbral_alerta"], c["umbral_evacuacion"])
-    return {**c, "clave": clave, "estado": estado, "emoji": emoji}
-
-
-def _localidad_con_estado(clave: str) -> dict:
-    loc = localidades[clave]
-    estado, emoji = calcular_estado(loc["nivel_metros"], loc["umbral_alerta"], loc["umbral_evacuacion"])
-    return {**loc, "clave": clave, "estado": estado, "emoji": emoji}
-
-
-class ActualizacionHidrologia(BaseModel):
+# Modelos de Datos Pydantic para el Portal de Corrientes
+class SOSTicket(BaseModel):
+    barrio: str
     localidad: str
-    nivel_metros: float
-    precipitacion_acumulada_mm: float | None = None
-
-
-# ---------------------------------------------------------------------
-# ENDPOINTS
-# ---------------------------------------------------------------------
-@app.get("/historico/{estacion}")
-def obtener_historico(estacion: str, dias: int = 60):
-    """
-    Serie historica de niveles para una estacion de niveles_rios.json
-    (ej. "Corrientes", "Empedrado", "Goya"). Necesita que este servicio
-    corra su propia copia de actualizar_niveles.py (o lea el mismo
-    niveles_rios.json que genera cuencas-bot, si se decide compartir
-    solo ese archivo puntual).
-    """
-    try:
-        with open("niveles_rios.json", "r", encoding="utf-8") as fh:
-            historico = json.load(fh)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"estacion": estacion, "lecturas": [], "error": "Historico no disponible todavia."}
-
-    limite = datetime.now(timezone.utc) - timedelta(days=dias)
-
-    def _fecha(fila):
-        try:
-            f = datetime.fromisoformat(fila["timestamp_consulta"].replace("Z", "+00:00"))
-            return f if f.tzinfo else f.replace(tzinfo=timezone.utc)
-        except (KeyError, ValueError, TypeError):
-            return None
-
-    lecturas = []
-    for fila in historico:
-        if fila.get("puerto", "").strip().lower() != estacion.strip().lower():
-            continue
-        fecha = _fecha(fila)
-        if fecha is None or fecha < limite:
-            continue
-        lecturas.append({
-            "fecha": fila["timestamp_consulta"],
-            "altura_m": fila.get("altura_actual_m"),
-        })
-
-    lecturas.sort(key=lambda l: l["fecha"])
-    return {"estacion": estacion, "lecturas": lecturas, "n_lecturas": len(lecturas)}
-
-
-@app.get("/")
-def raiz():
-    return {"servicio": "Portal Hidrico Corrientes - API", "estado": "activo"}
-
-
-# ---------------------------------------------------------------------
-# ORGANISMOS RELEVANTES — investigado y verificado 26/08/2026. Mezcla
-# de nivel nacional, provincial (Corrientes) y binacional. Los datos
-# de contacto/URL son los oficiales publicos; no se inventan telefonos
-# ni direcciones que no se pudieron verificar.
-# ---------------------------------------------------------------------
-ORGANISMOS: dict = {
-    "smn": {
-        "nombre": "Servicio Meteorologico Nacional (SMN)",
-        "nivel": "nacional",
-        "dependencia": "Ministerio de Defensa",
-        "rol": "Pronostico del tiempo y sistema de alerta temprana meteorologica (3 niveles: amarillo/naranja/rojo). Tiene seccion de datos abiertos.",
-        "url": "https://www.smn.gob.ar",
-        "url_alertas": "https://www.smn.gob.ar/alertas",
-    },
-    "ina": {
-        "nombre": "Instituto Nacional del Agua (INA)",
-        "nivel": "nacional",
-        "dependencia": "Secretaria de Infraestructura y Politica Hidrica, Ministerio de Obras Publicas",
-        "rol": "Calcula los PRONOSTICOS hidrologicos (no solo mide el nivel actual) de los rios Parana, Paraguay, Iguazu y Uruguay, via su Sistema de Informacion y Alerta Hidrologico (SIyAH). Reportes diarios.",
-        "url": "https://www.ina.gob.ar/siyah/index.php",
-        "url_alertas": "https://alerta.ina.gob.ar/a5/diario/reporte_diario",
-        "url_rss": "https://ina.gov.ar/alerta/rss/index.php",
-        "url_api": "https://alerta.ina.gob.ar/a5/secciones",
-        "nota": "El RSS publica un cuadro diario nuevo cada dia (Cuadro_AAAAmesDD.pdf) - candidato para automatizar la carga de datos en vez de depender solo del scraper de CIM-UNL.",
-    },
-    "icaa": {
-        "nombre": "Instituto Correntino del Agua y del Ambiente (ICAA)",
-        "nivel": "provincial (Corrientes)",
-        "dependencia": "Gobierno de la Provincia de Corrientes",
-        "rol": "Organismo hidrico PROVINCIAL de Corrientes. Redifunde y contextualiza para las localidades correntinas los informes del INA y de la Entidad Binacional Yacyreta (EBY).",
-        "url": "https://icaa.corrientes.gob.ar",
-    },
-    "defensa_civil_corrientes": {
-        "nombre": "Direccion de Defensa Civil de la Provincia de Corrientes",
-        "nivel": "provincial (Corrientes)",
-        "dependencia": "Gobierno de la Provincia de Corrientes",
-        "rol": "Coordinacion operativa de emergencias hidricas provinciales, articulado con el Ministerio de Obras y Servicios Publicos (MOSP). Segun declaraciones publicas de su director (2026), los rios internos (Corriente, Riachuelo, Santa Lucia) son la mayor fuente de problemas en el interior provincial.",
-        "url": None,
-    },
-    "eby": {
-        "nombre": "Entidad Binacional Yacyreta (EBY)",
-        "nivel": "binacional (Argentina-Paraguay)",
-        "dependencia": "Gobiernos de Argentina y Paraguay",
-        "rol": "Gestiona la represa Yacyreta (tramo Ituzaingo-Itati). Publica los caudales erogados, que inciden directo en esas dos localidades.",
-        "url": None,
-    },
-    "sinagir": {
-        "nombre": "Sistema Nacional de Gestion Integral del Riesgo (SINAGIR)",
-        "nivel": "nacional",
-        "dependencia": "Jefatura de Gabinete de Ministros (creado por Ley 27.287)",
-        "rol": "Coordina en emergencias a las Fuerzas Armadas, el SMN, el Instituto Geografico Nacional y demas organismos bajo la orbita de Defensa.",
-        "url": None,
-    },
-}
-
-
-@app.get("/organismos")
-def listar_organismos():
-    return {"organismos": ORGANISMOS}
-
-
-@app.get("/aguas-arriba")
-def estaciones_aguas_arriba():
-    """
-    Estaciones de referencia aguas arriba (Brasil/Paraguay/frontera) que
-    sirven de indicador temprano para lo que va a llegar a Corrientes en
-    los proximos dias. Fuente: reporte diario oficial del INA
-    (alerta.ina.gob.ar), dato del 28/08/2026.
-    """
-    return {"estaciones": ESTACIONES_AGUAS_ARRIBA, "fuente": "INA - alerta.ina.gob.ar/a5/diario/reporte_diario", "fecha_dato": "2026-08-28"}
-
-
-@app.get("/relieve")
-def relieve_provincial():
-    return CONTEXTO_RELIEVE
-
-
-@app.get("/localidades")
-def listar_localidades():
-    return {
-        "localidades": {clave: _localidad_con_estado(clave) for clave in localidades},
-        "explicaciones": EXPLICACIONES,
-    }
-
-
-@app.get("/localidades/{clave}")
-def obtener_localidad(clave: str):
-    clave = clave.lower()
-    if clave not in localidades:
-        return {"error": f"Localidad '{clave}' no encontrada"}
-    return {"localidad": _localidad_con_estado(clave), "explicaciones": EXPLICACIONES}
-
-
-@app.get("/cuencas")
-def listar_cuencas():
-    return {
-        "cuencas": {clave: _cuenca_con_estado(clave) for clave in CUENCAS},
-        "explicaciones": EXPLICACIONES,
-    }
-
-
-@app.get("/cuencas/{clave}")
-def obtener_cuenca(clave: str):
-    clave = clave.lower()
-    if clave not in CUENCAS:
-        return {"error": f"Cuenca '{clave}' no encontrada"}
-    localidades_de_la_cuenca = [
-        _localidad_con_estado(c) for c, v in localidades.items() if v["cuenca_clave"] == clave
-    ]
-    return {
-        "cuenca": _cuenca_con_estado(clave),
-        "localidades": localidades_de_la_cuenca,
-        "explicaciones": EXPLICACIONES,
-    }
-
-
-@app.get("/bot/consultar")
-def consultar_para_bot():
-    """Endpoint de compatibilidad, mismo formato que el de cuencas-bot."""
-    cap = _localidad_con_estado("corrientes")
-    return {
-        "hidrologia": {
-            "estacion": cap["nombre"],
-            "nivel_metros": cap["nivel_metros"],
-            "estado": cap["estado"],
-            "umbral_alerta": cap["umbral_alerta"],
-            "umbral_evacuacion": cap["umbral_evacuacion"],
-            "fuente": cap["fuente"],
-            "ultima_verificacion": cap["ultima_verificacion"],
-        },
-    }
-
-
-@app.get("/barrios")
-def listar_barrios():
-    resultado = {}
-    for clave, b in BARRIOS_VULNERABLES.items():
-        padre = _localidad_con_estado(b["localidad_padre"])
-        resultado[clave] = {
-            **b, "clave": clave,
-            "estado": padre["estado"], "emoji": padre["emoji"],
-            "nombre_localidad_padre": padre["nombre"],
-        }
-    return {"barrios": resultado}
-
-
-@app.get("/barrios/{localidad_clave}")
-def barrios_de_localidad(localidad_clave: str):
-    localidad_clave = localidad_clave.lower()
-    if localidad_clave not in localidades:
-        return {"error": f"Localidad '{localidad_clave}' no encontrada"}
-    padre = _localidad_con_estado(localidad_clave)
-    resultado = {
-        clave: {**b, "clave": clave, "estado": padre["estado"], "emoji": padre["emoji"]}
-        for clave, b in BARRIOS_VULNERABLES.items()
-        if b["localidad_padre"] == localidad_clave
-    }
-    return {"barrios": resultado}
-
-
-@app.post("/hidrologia/actualizar")
-def actualizar_hidrologia(datos: ActualizacionHidrologia):
-    clave = datos.localidad.lower()
-    if clave not in localidades:
-        return {"error": f"Localidad '{datos.localidad}' no reconocida"}
-    localidades[clave]["nivel_metros"] = datos.nivel_metros
-    if datos.precipitacion_acumulada_mm is not None:
-        localidades[clave]["precipitacion_acumulada_mm"] = datos.precipitacion_acumulada_mm
-    localidades[clave]["conectado"] = True
-    localidades[clave]["ultima_verificacion"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return {"ok": True, "localidad": _localidad_con_estado(clave)}
-
-
-# ---------------------------------------------------------------------
-# SOS Y REPORTES CIUDADANOS — propios de este backend, no comparten
-# tabla ni proyecto de Supabase con cuencas-bot (Chaco).
-# ---------------------------------------------------------------------
-tickets_sos: list = []
-reportes_ciudadanos: list = []
-
-
-class SolicitudSOS(BaseModel):
-    nombre: str
     telefono: str
-    localidad: str
-    direccion: str | None = None
-    lat: float
-    lon: float
-    personas_afectadas: int = 1
-    altura_agua_cm: int | None = None
-    nivel_urgencia: str = "ALTO"  # ALTO / MEDIO / BAJO
-    requiere: list[str] = []
-    notas: str | None = None
-
-
-class ActualizacionSOS(BaseModel):
-    estado: str  # PENDIENTE / DESPACHADO / RESUELTO
-    unidad_asignada: str | None = None
-    notas_despacho: str | None = None
-
+    descripcion: str
 
 class ReporteCiudadano(BaseModel):
-    nombre: str
+    barrio: str
     localidad: str
-    calle: str
-    lat: float
-    lon: float
-    nivel_agua_aprox: str = "CORDON"
-    descripcion: str | None = None
+    categoria: str
+    descripcion: str
 
+memory_sos_tickets = []
+memory_reportes = []
 
-@app.post("/sos")
-def crear_solicitud_sos(datos: SolicitudSOS):
-    if datos.localidad.lower() not in localidades:
-        return {"error": f"Localidad '{datos.localidad}' no reconocida"}
-    ticket = {
-        "id": f"sos_{int(datetime.now(timezone.utc).timestamp() * 1000)}",
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        **datos.model_dump(),
-        "estado": "PENDIENTE",
-        "unidad_asignada": None,
-        "notas_despacho": None,
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "service": "Portal Hídrico Corrientes",
+        "modulo_satelital": "Conectado via satelites_ctes.py",
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+@app.post("/api/sos")
+def crear_ticket_sos(ticket: SOSTicket):
     if supabase:
-        supabase.table("sos_tickets").insert(ticket).execute()
+        response = supabase.table("sos_tickets").insert(ticket.model_dump()).execute()
+        return {"status": "success", "data": response.data}
     else:
-        tickets_sos.insert(0, ticket)
-    return {"ok": True, "ticket": ticket}
+        ticket_dict = ticket.model_dump()
+        memory_sos_tickets.append(ticket_dict)
+        return {"status": "success", "data": ticket_dict, "storage": "memory"}
 
-
-@app.get("/sos")
-def listar_solicitudes_sos():
+@app.post("/api/reportes")
+def crear_reporte_ciudadano(reporte: ReporteCiudadano):
     if supabase:
-        resultado = (
-            supabase.table("sos_tickets")
-            .select("*")
-            .order("created_at", desc=True)
-            .execute()
-        )
-        return {"tickets": resultado.data}
-    return {"tickets": tickets_sos}
+        response = supabase.table("reportes_ciudadanos").insert(reporte.model_dump()).execute()
+        return {"status": "success", "data": response.data}
+    else:
+        reporte_dict = reporte.model_dump()
+        memory_reportes.append(reporte_dict)
+        return {"status": "success", "data": reporte_dict, "storage": "memory"}
 
-
-@app.patch("/sos/{ticket_id}")
-def actualizar_solicitud_sos(ticket_id: str, datos: ActualizacionSOS):
-    cambios = {"estado": datos.estado}
-    if datos.unidad_asignada is not None:
-        cambios["unidad_asignada"] = datos.unidad_asignada
-    if datos.notas_despacho is not None:
-        cambios["notas_despacho"] = datos.notas_despacho
-
-    if supabase:
-        resultado = (
-            supabase.table("sos_tickets").update(cambios).eq("id", ticket_id).execute()
-        )
-        if not resultado.data:
-            return {"error": f"Ticket '{ticket_id}' no encontrado"}
-        return {"ok": True, "ticket": resultado.data[0]}
-
-    ticket = next((t for t in tickets_sos if t["id"] == ticket_id), None)
-    if ticket is None:
-        return {"error": f"Ticket '{ticket_id}' no encontrado"}
-    ticket.update(cambios)
-    return {"ok": True, "ticket": ticket}
-
-
-@app.post("/reportes")
-def crear_reporte_ciudadano(datos: ReporteCiudadano):
-    if datos.localidad.lower() not in localidades:
-        return {"error": f"Localidad '{datos.localidad}' no reconocida"}
-    reporte = {
-        "id": f"rep_{int(datetime.now(timezone.utc).timestamp() * 1000)}",
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        **datos.model_dump(),
+@app.get("/api/niveles")
+def obtener_niveles_corrientes():
+    ruta_json = "niveles_rios.json"
+    if not os.path.exists(ruta_json):
+        raise HTTPException(status_code=404, detail="Archivo de niveles hídricos no disponible.")
+        
+    with open(ruta_json, "r", encoding="utf-8") as f:
+        datos = json.load(f)
+    
+    puertos_corrientes = ["Corrientes", "Itatí", "Paso de la Patria", "Bella Vista", "Goya", "Esquina"]
+    niveles_filtrados = {p: datos.get(p, {"nivel": "N/D", "estado": "Sin datos"}) for p in puertos_corrientes}
+    
+    return {
+        "fuente": "Prefectura Naval Argentina vía CIM-UNL",
+        "puertos": niveles_filtrados,
+        "contexto_geografico": CONTEXTO_RELIEVE
     }
-    if supabase:
-        supabase.table("reportes_ciudadanos").insert(reporte).execute()
-    else:
-        reportes_ciudadanos.insert(0, reporte)
-    return {"ok": True, "reporte": reporte}
-
-
-@app.get("/reportes")
-def listar_reportes_ciudadanos():
-    if supabase:
-        resultado = (
-            supabase.table("reportes_ciudadanos")
-            .select("*")
-            .order("created_at", desc=True)
-            .execute()
-        )
-        return {"reportes": resultado.data}
-    return {"reportes": reportes_ciudadanos}
-
-
-# NOTA: todavia no hay bot.py / whatsapp_webhook.py propio para
-# Corrientes. Cuando decidamos la Etapa 2 (alertas por Telegram +
-# WhatsApp), se arma un bot separado que le pegue a ESTA API, igual
-# que bot.py le pega a cuencas-bot para Chaco.
-
-# ---------------------------------------------------------------------
-# ETAPA 2 — ALERTA TEMPRANA (Telegram + Google/FCM + email de respaldo)
-# ---------------------------------------------------------------------
-from alertas import router as alertas_router, registrar_supabase, verificar_y_disparar_alertas
-
-app.include_router(alertas_router)
-
-if supabase:
-    registrar_supabase(supabase)
-
-
-@app.post("/alertas/verificar")
-def verificar_alertas():
-    """
-    Compara el estado actual de cada localidad contra el ultimo estado
-    conocido y dispara avisos (Telegram/push/email) a quien este
-    suscripto, solo cuando una localidad SUBE de estado (ej. NORMAL ->
-    ALERTA). Pensado para llamarse desde un cron externo (Render Cron
-    Job o GitHub Actions) cada 15-30 min.
-    """
-    return verificar_y_disparar_alertas(localidades, calcular_estado)
