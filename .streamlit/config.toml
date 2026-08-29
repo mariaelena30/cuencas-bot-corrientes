@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#7B1FA2"               # Morado Franja principal
+backgroundColor = "#FAF7FC"            # Fondo claro con tinte lavanda suave
+secondaryBackgroundColor = "#EDE7F6"   # Fondo de barra lateral y tarjetas secundarias
+textColor = "#2A0845"                  # Texto oscuro violeta profundo
+font = "sans serif"
